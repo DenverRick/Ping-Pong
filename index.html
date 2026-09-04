@@ -81,149 +81,248 @@
         table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; border-radius: 8px; overflow: hidden; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
         th { background-color: #e5e7eb; }
+        th.num, td.num { text-align: right; width: 4.5em; }
+        h3 { margin: 24px 0 0 0; font-size: 16px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; }
+        .hint { text-align: center; color: #6b7280; margin: 4px 0 12px 0; }
+        .end-group { border: 2px solid; border-radius: 12px; padding: 4px 12px 12px 12px; margin: 12px 0; }
+        .end-group legend { font-weight: bold; padding: 0 6px; }
+        .north-group { border-color: var(--north-color); }
+        .north-group legend { color: var(--north-color); }
+        .south-group { border-color: var(--south-color); }
+        .south-group legend { color: var(--south-color); }
+        .team-card .record { font-size: 13px; opacity: 0.85; }
+        .team-card:focus-visible { outline: 3px solid #1f2937; outline-offset: 2px; }
     </style>
 </head>
 <body>
 
     <div id="setup-screen" class="screen">
         <h1>Ping Pong Tracker</h1>
-        <p>Enter 4 player names:</p>
-        <input type="text" id="p1" placeholder="Player 1" value="Alice">
-        <input type="text" id="p2" placeholder="Player 2" value="Bob">
-        <input type="text" id="p3" placeholder="Player 3" value="Charlie">
-        <input type="text" id="p4" placeholder="Player 4" value="Diana">
+        <p>Enter the four players by where they start:</p>
+        <fieldset class="end-group north-group">
+            <legend>North end</legend>
+            <input type="text" id="p1" placeholder="North player 1" value="Carl" aria-label="North player 1">
+            <input type="text" id="p2" placeholder="North player 2" value="Rick" aria-label="North player 2">
+        </fieldset>
+        <fieldset class="end-group south-group">
+            <legend>South end</legend>
+            <input type="text" id="p3" placeholder="South player 1" value="Rico" aria-label="South player 1">
+            <input type="text" id="p4" placeholder="South player 2" value="Rich" aria-label="South player 2">
+        </fieldset>
+        <p class="hint">A round is 3 games. Partners rotate each game so everyone plays with everyone once per round.</p>
         <button class="primary" onclick="startGame()">Start Tournament</button>
     </div>
 
     <div id="game-screen" class="screen">
-        <h2 id="round-title">Game 1</h2>
-        <p style="text-align: center; color: #6b7280;">Tap the winning team</p>
-        
-        <div class="team-card north" onclick="recordWin('North')">
+        <h2 id="round-title">Round 1 · Game 1 of 3</h2>
+        <p class="hint">Tap the winning team</p>
+
+        <div class="team-card north" role="button" tabindex="0" onclick="recordWin('North')" onkeydown="cardKey(event, 'North')">
             NORTH
-            <p id="north-players">P1 & P2</p>
+            <p id="north-players">P1 &amp; P2</p>
+            <p class="record" id="north-record"></p>
         </div>
-        
+
         <div class="vs">VS</div>
-        
-        <div class="team-card south" onclick="recordWin('South')">
+
+        <div class="team-card south" role="button" tabindex="0" onclick="recordWin('South')" onkeydown="cardKey(event, 'South')">
             SOUTH
-            <p id="south-players">P3 & P4</p>
+            <p id="south-players">P3 &amp; P4</p>
+            <p class="record" id="south-record"></p>
         </div>
-        
+
         <button class="danger" onclick="resetTournament()" style="margin-top: 40px;">End Tournament</button>
     </div>
 
     <div id="ranking-screen" class="screen">
         <h2>Rankings</h2>
+        <p class="hint" id="ranking-subtitle"></p>
+
+        <h3>Players</h3>
         <table id="leaderboard">
             <thead>
-                <tr>
-                    <th>Player</th>
-                    <th>Wins</th>
-                </tr>
+                <tr><th>Player</th><th class="num">Wins</th><th class="num">Played</th></tr>
             </thead>
-            <tbody id="leaderboard-body">
-                </tbody>
+            <tbody id="leaderboard-body"></tbody>
         </table>
-        <button class="primary" onclick="nextGame()">Next Game</button>
+
+        <h3>Teams</h3>
+        <table id="team-board">
+            <thead>
+                <tr><th>Team</th><th class="num">Wins</th><th class="num">Played</th></tr>
+            </thead>
+            <tbody id="team-board-body"></tbody>
+        </table>
+
+        <button class="primary" id="next-button" onclick="nextGame()">Next Game</button>
         <button class="danger" onclick="resetTournament()">End Tournament</button>
     </div>
 
     <script>
-        // State Management
-        let players = [];
-        let gameIndex = 0;
+        // A round is the 3 games in which every player partners with every other player once.
+        // Each entry is [northA, northB, southA, southB] as indexes into players.
         const combinations = [
-            [0, 1, 2, 3], // P1+P2 vs P3+P4
-            [0, 2, 1, 3], // P1+P3 vs P2+P4
-            [0, 3, 1, 2]  // P1+P4 vs P2+P3
+            [0, 1, 2, 3], // starting ends: N1+N2 vs S1+S2
+            [0, 2, 1, 3], // N1+S1 vs N2+S2
+            [0, 3, 1, 2]  // N1+S2 vs N2+S1
         ];
+        const GAMES_PER_ROUND = combinations.length;
+        const STORAGE_KEY = 'pingPongState';
+
+        // State: player names, one result per completed game ('North' | 'South'),
+        // the index of the game being played, and which screen is showing.
+        let players = [];
+        let results = [];
+        let gameIndex = 0;
+        let phase = 'game'; // 'game' = waiting for a result, 'ranking' = result recorded
         let currentMatch = [];
 
-        // Check for saved game on load
         window.onload = () => {
-            const savedState = localStorage.getItem('pingPongState');
+            const savedState = localStorage.getItem(STORAGE_KEY);
             if (savedState) {
                 const state = JSON.parse(savedState);
                 players = state.players;
+                results = state.results || [];
                 gameIndex = state.gameIndex;
+                phase = state.phase || 'game';
                 setupMatch();
-                showScreen('game-screen');
+                if (phase === 'ranking') {
+                    updateRankings();
+                    showScreen('ranking-screen');
+                } else {
+                    showScreen('game-screen');
+                }
             } else {
                 showScreen('setup-screen');
             }
         };
 
         function saveState() {
-            const state = { players, gameIndex };
-            localStorage.setItem('pingPongState', JSON.stringify(state));
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ players, results, gameIndex, phase }));
         }
 
         function showScreen(screenId) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
             document.getElementById(screenId).classList.add('active');
+            window.scrollTo(0, 0);
         }
 
         function startGame() {
-            players = [
-                { name: document.getElementById('p1').value || "Player 1", wins: 0 },
-                { name: document.getElementById('p2').value || "Player 2", wins: 0 },
-                { name: document.getElementById('p3').value || "Player 3", wins: 0 },
-                { name: document.getElementById('p4').value || "Player 4", wins: 0 }
-            ];
+            players = ['p1', 'p2', 'p3', 'p4'].map((id, i) =>
+                document.getElementById(id).value.trim() || `Player ${i + 1}`);
+            results = [];
             gameIndex = 0;
-            saveState(); // Save immediately after starting
+            phase = 'game';
+            saveState();
             setupMatch();
             showScreen('game-screen');
         }
 
+        function roundNumber(index) { return Math.floor(index / GAMES_PER_ROUND) + 1; }
+        function gameInRound(index) { return (index % GAMES_PER_ROUND) + 1; }
+
+        function teamKey(a, b) { return [a, b].sort((x, y) => x - y).join('-'); }
+        function teamName(a, b) { return `${players[a]} & ${players[b]}`; }
+
+        // Derive every standing from the results log so the numbers can never drift apart.
+        function computeStats() {
+            const playerStats = players.map(name => ({ name, wins: 0, played: 0 }));
+            const teamStats = {};
+            results.forEach((winner, i) => {
+                const [nA, nB, sA, sB] = combinations[i % GAMES_PER_ROUND];
+                const north = [nA, nB], south = [sA, sB];
+                [north, south].forEach(pair => {
+                    const key = teamKey(pair[0], pair[1]);
+                    teamStats[key] = teamStats[key] || { name: teamName(pair[0], pair[1]), wins: 0, played: 0 };
+                    teamStats[key].played += 1;
+                    pair.forEach(p => playerStats[p].played += 1);
+                });
+                const winners = winner === 'North' ? north : south;
+                teamStats[teamKey(winners[0], winners[1])].wins += 1;
+                winners.forEach(p => playerStats[p].wins += 1);
+            });
+            return { playerStats, teamStats };
+        }
+
+        function recordText(a, b, teamStats) {
+            const t = teamStats[teamKey(a, b)];
+            if (!t) return 'First game together';
+            return `${t.wins} win${t.wins === 1 ? '' : 's'} in ${t.played} game${t.played === 1 ? '' : 's'} together`;
+        }
+
         function setupMatch() {
-            const comboIndex = gameIndex % 3; 
-            currentMatch = combinations[comboIndex];
-            
-            document.getElementById('round-title').innerText = `Game ${gameIndex + 1}`;
-            document.getElementById('north-players').innerText = `${players[currentMatch[0]].name} & ${players[currentMatch[1]].name}`;
-            document.getElementById('south-players').innerText = `${players[currentMatch[2]].name} & ${players[currentMatch[3]].name}`;
+            currentMatch = combinations[gameIndex % GAMES_PER_ROUND];
+            const [nA, nB, sA, sB] = currentMatch;
+            const { teamStats } = computeStats();
+
+            document.getElementById('round-title').textContent =
+                `Round ${roundNumber(gameIndex)} · Game ${gameInRound(gameIndex)} of ${GAMES_PER_ROUND}`;
+            document.getElementById('north-players').textContent = teamName(nA, nB);
+            document.getElementById('south-players').textContent = teamName(sA, sB);
+            document.getElementById('north-record').textContent = recordText(nA, nB, teamStats);
+            document.getElementById('south-record').textContent = recordText(sA, sB, teamStats);
+        }
+
+        function cardKey(event, side) {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                recordWin(side);
+            }
         }
 
         function recordWin(winningSide) {
-            if (winningSide === 'North') {
-                players[currentMatch[0]].wins += 1;
-                players[currentMatch[1]].wins += 1;
-            } else {
-                players[currentMatch[2]].wins += 1;
-                players[currentMatch[3]].wins += 1;
-            }
-            saveState(); // Save scores
+            if (phase !== 'game') return; // ignore a double tap
+            results[gameIndex] = winningSide;
+            phase = 'ranking';
+            saveState();
             updateRankings();
             showScreen('ranking-screen');
         }
 
-        function updateRankings() {
-            const tbody = document.getElementById('leaderboard-body');
+        function fillTable(tbodyId, rows) {
+            const tbody = document.getElementById(tbodyId);
             tbody.innerHTML = '';
-            
-            const sortedPlayers = [...players].sort((a, b) => b.wins - a.wins);
-            
-            sortedPlayers.forEach(p => {
-                const row = `<tr><td>${p.name}</td><td>${p.wins}</td></tr>`;
-                tbody.innerHTML += row;
+            rows.forEach(r => {
+                const row = tbody.insertRow();
+                row.insertCell().textContent = r.name;
+                const wins = row.insertCell(); wins.textContent = r.wins; wins.className = 'num';
+                const played = row.insertCell(); played.textContent = r.played; played.className = 'num';
             });
+        }
+
+        function updateRankings() {
+            const { playerStats, teamStats } = computeStats();
+            const byWins = (a, b) => b.wins - a.wins || a.played - b.played || a.name.localeCompare(b.name);
+
+            fillTable('leaderboard-body', [...playerStats].sort(byWins));
+            fillTable('team-board-body', Object.values(teamStats).sort(byWins));
+
+            const winner = results[gameIndex];
+            const [nA, nB, sA, sB] = currentMatch;
+            const winningTeam = winner === 'North' ? teamName(nA, nB) : teamName(sA, sB);
+            document.getElementById('ranking-subtitle').textContent =
+                `Round ${roundNumber(gameIndex)}, Game ${gameInRound(gameIndex)}: ${winner} won (${winningTeam})`;
+
+            const roundOver = gameInRound(gameIndex) === GAMES_PER_ROUND;
+            document.getElementById('next-button').textContent =
+                roundOver ? `Start Round ${roundNumber(gameIndex) + 1}` : 'Next Game';
         }
 
         function nextGame() {
             gameIndex++;
-            saveState(); // Save progress to next round
+            phase = 'game';
+            saveState();
             setupMatch();
             showScreen('game-screen');
         }
 
         function resetTournament() {
             if (confirm("Are you sure you want to end this tournament? All scores will be lost.")) {
-                localStorage.removeItem('pingPongState');
+                localStorage.removeItem(STORAGE_KEY);
                 players = [];
+                results = [];
                 gameIndex = 0;
+                phase = 'game';
                 showScreen('setup-screen');
             }
         }
