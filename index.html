@@ -49,6 +49,19 @@
             cursor: pointer;
         }
 
+        button.link {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            background: none;
+            border: none;
+            color: #4b5563;
+            font-size: 15px;
+            text-decoration: underline;
+            margin-top: 8px;
+            cursor: pointer;
+        }
+
         button.danger {
             width: 100%;
             padding: 16px;
@@ -198,12 +211,14 @@
             </div>
         </div>
 
-        <button class="danger" onclick="resetTournament()" style="margin-top: 40px;">End Tournament</button>
+        <button class="link" id="undo-last-button" onclick="undoLast()">Undo last game's result</button>
+        <button class="danger" onclick="resetTournament()">End Tournament</button>
     </div>
 
     <div id="ranking-screen" class="screen">
         <h2>Rankings</h2>
         <p class="hint" id="ranking-subtitle"></p>
+        <button class="link" id="undo-button" onclick="undoLast()">Wrong end? Undo this result</button>
 
         <h3>Players</h3>
         <table id="leaderboard">
@@ -330,6 +345,7 @@
             document.getElementById('south-b').textContent = players[sB];
             document.getElementById('north-record').textContent = recordText(nA, nB, teamStats);
             document.getElementById('south-record').textContent = recordText(sA, sB, teamStats);
+            document.getElementById('undo-last-button').hidden = gameIndex === 0;
         }
 
         function cardKey(event, side) {
@@ -375,6 +391,24 @@
             const roundOver = gameInRound(gameIndex) === GAMES_PER_ROUND;
             document.getElementById('next-button').textContent =
                 roundOver ? `Start Round ${roundNumber(gameIndex) + 1}` : 'Next Game';
+        }
+
+        // Reverts the most recent recorded result. From the rankings screen that is the
+        // game just tapped; from the game screen it is the previous game, which is
+        // reopened so the correct end can be tapped.
+        function undoLast() {
+            if (phase === 'ranking') {
+                results.length = gameIndex;
+            } else if (gameIndex > 0) {
+                gameIndex--;
+                results.length = gameIndex;
+            } else {
+                return;
+            }
+            phase = 'game';
+            saveState();
+            setupMatch();
+            showScreen('game-screen');
         }
 
         function nextGame() {
