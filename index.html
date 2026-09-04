@@ -62,21 +62,84 @@
             cursor: pointer;
         }
 
-        .team-card {
-            padding: 40px 20px;
-            border-radius: 12px;
-            text-align: center;
-            margin: 15px 0;
-            color: white;
-            font-size: 24px;
-            font-weight: bold;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            cursor: pointer;
+        /* Top-down ping pong table: North end at the top of the phone, South at the bottom */
+        .table {
+            position: relative;
+            border: 5px solid #ffffff;
+            box-shadow: 0 0 0 4px #1f2937, 0 6px 12px rgba(0,0,0,0.2);
+            border-radius: 8px;
+            margin: 16px 10px 8px 10px;
+            overflow: visible;
         }
-        .team-card p { margin: 10px 0 0 0; font-size: 16px; font-weight: normal; }
-        .north { background-color: var(--north-color); }
-        .south { background-color: var(--south-color); }
-        .vs { text-align: center; font-size: 20px; font-weight: bold; color: #6b7280; }
+        .table::before { /* centre line for doubles */
+            content: "";
+            position: absolute;
+            left: 50%;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            margin-left: -1px;
+            background: rgba(255,255,255,0.85);
+            pointer-events: none;
+        }
+        .end {
+            position: relative;
+            padding: 14px 10px 12px 10px;
+            text-align: center;
+            color: white;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            min-height: 150px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .end.north { background-color: var(--north-color); border-radius: 3px 3px 0 0; }
+        .end.south { background-color: var(--south-color); border-radius: 0 0 3px 3px; }
+        .end:active { filter: brightness(1.2); }
+        .end:focus-visible { outline: 3px solid #ffffff; outline-offset: -6px; }
+        .end-label { font-size: 22px; font-weight: bold; letter-spacing: 0.08em; text-shadow: 0 1px 2px rgba(0,0,0,0.4); }
+        .seats { display: flex; gap: 12px; justify-content: center; margin: 8px 0; position: relative; }
+        .seat {
+            flex: 1 1 0;
+            max-width: 46%;
+            background: white;
+            color: var(--text-dark);
+            border-radius: 999px;
+            padding: 10px 6px;
+            font-size: 16px;
+            font-weight: bold;
+            border: 3px solid transparent;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.25);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .north .seat { border-color: var(--north-color); }
+        .south .seat { border-color: var(--south-color); }
+        .record { margin: 0; font-size: 13px; opacity: 0.9; text-shadow: 0 1px 2px rgba(0,0,0,0.4); }
+        .net { /* the net, with posts sticking out past the table edges */
+            position: relative;
+            height: 10px;
+            margin: 0 -14px;
+            background: repeating-linear-gradient(90deg, #2b2b2b 0 3px, #9ca3af 3px 5px);
+            border-top: 2px solid #f9fafb;
+            border-bottom: 2px solid #f9fafb;
+            z-index: 1;
+            pointer-events: none;
+        }
+        .net::before, .net::after {
+            content: "";
+            position: absolute;
+            top: -4px;
+            width: 8px;
+            height: 18px;
+            background: #374151;
+            border-radius: 2px;
+        }
+        .net::before { left: 0; }
+        .net::after { right: 0; }
 
         table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; border-radius: 8px; overflow: hidden; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
@@ -90,8 +153,6 @@
         .north-group legend { color: var(--north-color); }
         .south-group { border-color: var(--south-color); }
         .south-group legend { color: var(--south-color); }
-        .team-card .record { font-size: 13px; opacity: 0.85; }
-        .team-card:focus-visible { outline: 3px solid #1f2937; outline-offset: 2px; }
     </style>
 </head>
 <body>
@@ -115,20 +176,26 @@
 
     <div id="game-screen" class="screen">
         <h2 id="round-title">Round 1 · Game 1 of 3</h2>
-        <p class="hint">Tap the winning team</p>
+        <p class="hint">Tap the end that won</p>
 
-        <div class="team-card north" role="button" tabindex="0" onclick="recordWin('North')" onkeydown="cardKey(event, 'North')">
-            NORTH
-            <p id="north-players">P1 &amp; P2</p>
-            <p class="record" id="north-record"></p>
-        </div>
-
-        <div class="vs">VS</div>
-
-        <div class="team-card south" role="button" tabindex="0" onclick="recordWin('South')" onkeydown="cardKey(event, 'South')">
-            SOUTH
-            <p id="south-players">P3 &amp; P4</p>
-            <p class="record" id="south-record"></p>
+        <div class="table" aria-label="Ping pong table, viewed from above">
+            <div class="end north" role="button" tabindex="0" aria-label="North team won" onclick="recordWin('North')" onkeydown="cardKey(event, 'North')">
+                <span class="end-label">NORTH</span>
+                <div class="seats">
+                    <span class="seat" id="north-a"></span>
+                    <span class="seat" id="north-b"></span>
+                </div>
+                <p class="record" id="north-record"></p>
+            </div>
+            <div class="net" aria-hidden="true"></div>
+            <div class="end south" role="button" tabindex="0" aria-label="South team won" onclick="recordWin('South')" onkeydown="cardKey(event, 'South')">
+                <p class="record" id="south-record"></p>
+                <div class="seats">
+                    <span class="seat" id="south-a"></span>
+                    <span class="seat" id="south-b"></span>
+                </div>
+                <span class="end-label">SOUTH</span>
+            </div>
         </div>
 
         <button class="danger" onclick="resetTournament()" style="margin-top: 40px;">End Tournament</button>
@@ -257,8 +324,10 @@
 
             document.getElementById('round-title').textContent =
                 `Round ${roundNumber(gameIndex)} · Game ${gameInRound(gameIndex)} of ${GAMES_PER_ROUND}`;
-            document.getElementById('north-players').textContent = teamName(nA, nB);
-            document.getElementById('south-players').textContent = teamName(sA, sB);
+            document.getElementById('north-a').textContent = players[nA];
+            document.getElementById('north-b').textContent = players[nB];
+            document.getElementById('south-a').textContent = players[sA];
+            document.getElementById('south-b').textContent = players[sB];
             document.getElementById('north-record').textContent = recordText(nA, nB, teamStats);
             document.getElementById('south-record').textContent = recordText(sA, sB, teamStats);
         }
