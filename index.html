@@ -166,6 +166,30 @@
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
         th { background-color: #e5e7eb; }
         th.num, td.num { text-align: right; width: 4.5em; }
+        details.history { margin-top: 24px; }
+        details.history summary {
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            padding: 8px 0;
+        }
+        #history-table td:first-child { white-space: nowrap; color: #6b7280; }
+        #history-table td:last-child { line-height: 1.4; }
+        .badge {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: bold;
+            color: white;
+            padding: 1px 6px;
+            border-radius: 999px;
+            margin-left: 6px;
+            vertical-align: 1px;
+        }
+        .badge.north { background: var(--north-color); }
+        .badge.south { background: var(--south-color); }
         h3 { margin: 24px 0 0 0; font-size: 16px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; }
         .hint { text-align: center; color: #6b7280; margin: 4px 0 12px 0; }
         .end-group { border: 2px solid; border-radius: 12px; padding: 4px 12px 12px 12px; margin: 12px 0; }
@@ -243,6 +267,16 @@
             </thead>
             <tbody id="team-board-body"></tbody>
         </table>
+
+        <details class="history" id="history">
+            <summary>Game history (<span id="history-count">0</span>)</summary>
+            <table id="history-table">
+                <thead>
+                    <tr><th>Game</th><th>Result</th></tr>
+                </thead>
+                <tbody id="history-body"></tbody>
+            </table>
+        </details>
 
         <button class="primary" id="next-button" onclick="nextGame()">Next Game</button>
         <button class="danger" onclick="resetTournament()">End Tournament</button>
@@ -383,8 +417,32 @@
             });
         }
 
+        // One row per completed game, most recent first, derived from the results log.
+        function fillHistory() {
+            const tbody = document.getElementById('history-body');
+            tbody.innerHTML = '';
+            document.getElementById('history-count').textContent = results.length;
+            for (let i = results.length - 1; i >= 0; i--) {
+                const [nA, nB, sA, sB] = combinations[i % GAMES_PER_ROUND];
+                const winner = results[i];
+                const won = winner === 'North' ? teamName(nA, nB) : teamName(sA, sB);
+                const lost = winner === 'North' ? teamName(sA, sB) : teamName(nA, nB);
+
+                const row = tbody.insertRow();
+                row.insertCell().textContent = `R${roundNumber(i)} · G${gameInRound(i)}`;
+                const cell = row.insertCell();
+                const strong = document.createElement('strong');
+                strong.textContent = won;
+                const badge = document.createElement('span');
+                badge.className = `badge ${winner.toLowerCase()}`;
+                badge.textContent = winner === 'North' ? 'N' : 'S';
+                cell.append(strong, badge, document.createTextNode(` beat ${lost}`));
+            }
+        }
+
         function updateRankings() {
             const { playerStats, teamStats } = computeStats();
+            fillHistory();
             const byWins = (a, b) => b.wins - a.wins || a.played - b.played || a.name.localeCompare(b.name);
 
             fillTable('leaderboard-body', [...playerStats].sort(byWins));
