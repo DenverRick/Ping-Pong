@@ -9,8 +9,8 @@ Live: https://ping-pong-tracker.netlify.app (deploys from `main` on GitHub)
 - Game screen is a top-down table: North end at the top, South at the bottom, each end showing its two players and running record; tap the end that won.
 - Rankings show Players and Teams tables (wins and games played), derived from a results log.
 - Default names: Carl, Rick, Rico, Rich.
+- App icon (red paddle + white ball on navy), web manifest, and iOS home-screen metadata (standalone, title "Ping Pong").
 - Undo: "Wrong end?" link on the rankings screen reverts the tap just made; "Undo last game's result" on the game screen reopens the previous game.
 
 ## Next
-- App icon, manifest, and iOS home-screen metadata.
 - Optional: history of games played this session.
